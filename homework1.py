@@ -91,9 +91,70 @@ def saving(S_new=S_new, index=index, data_con=data_con):
     return solve
 
 
+def desolve(solve, C=C):
+    """
+    求解解的总路程
+    :param solve: 解
+    :param C: 距离矩阵
+    :return: 总距离total_distance
+    """
+    total_distance = 0
+    for i in range(len(solve)):
+        row_distance = 0
+        for j in range(len(solve[i][0]) - 1):
+            row_distance = row_distance + C[solve[i][0][j]][solve[i][0][j + 1]]
+        solve[i].append(row_distance)
+        total_distance += row_distance
+
+    return total_distance, solve
+
+
+def deal_solve(solve_k, data_e=data_e):
+    """
+    处理每一个子解的序列，使之方便绘图
+    :param solve_k: 每一个子解
+    :param data_e: 坐标
+    :return: 绘图用x,y
+    """
+    decode_x, decode_y = data_e[solve_k[0], 0], data_e[solve_k[0], 1]
+    x, y = [], []
+    for ix in range(len(decode_x) - 1):
+        x.append([decode_x[ix], decode_x[ix + 1]])
+        y.append([decode_y[ix], decode_y[ix + 1]])
+    return x, y
+
+
+def solve_plot(solve, data_e=data_e):
+    """
+    对输入的解作图
+    :param solve:解
+    :param data_e:坐标
+    :return:图
+    """
+    fig = plt.figure()
+    ax1 = fig.add_subplot(1, 1, 1)
+    ax1.set_title("solve")
+    ax1.set_xlabel("x")
+    ax1.set_ylabel("y")
+    ax1.scatter(data_e[:, 0], data_e[:, 1], c='r', marker='.')  # 绘制初步的散点
+
+    for i, txt in enumerate(range(data_e.shape[0])):  # 给点写上编号
+        ax1.annotate(txt, (data_e[i, 0], data_e[i, 1]))
+
+    for i in range(len(solve)):
+        x, y = deal_solve(solve[i])
+        for j in range(len(x)):
+            plt.plot(x[j], y[j], color='r')
+
+    print(data_e[solve[0][0], 0], data_e[solve[0][0], 1])
+    plt.show()
+
+
 def main():
-    solve = saving()
-    return solve
+    solve_greedy = saving()
+    total_distance, initial = desolve(solve_greedy)
+    solve_plot(initial)
+    return initial
 
 
 main()
