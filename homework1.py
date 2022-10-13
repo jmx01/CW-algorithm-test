@@ -9,7 +9,7 @@ data_origin = pd.read_excel("./data.xlsx")
 dt = data_origin.copy()  # 复制数据
 dt.iloc[0, 3] = 0  # 处理仓库
 data_e = np.array(dt.iloc[:, 1:3])  # 单独取出坐标
-data_con = np.array(dt.iloc[:, 3])  # 客户点的量
+data_con = np.array(dt.iloc[:, 3])  # 客户点的量  0 - 70
 
 C = np.zeros([data_e.shape[0], data_e.shape[0]])  # 距离矩阵，创建零矩阵
 for i in range(C.shape[0]):
@@ -28,66 +28,53 @@ index = np.argsort(S.flatten())[::-1]  # 排序编码下标
 
 
 def saving(S_new=S_new, index=index, data_con=data_con):
-    """
-    节约算法
-    :param S_new: 节约矩阵
-    :param index: 排序下标
-    :param data_con: 客户需求
-    :return: 解
-    """
-    solve = []  # 解的初始化
-    solve_k = [[0], 0]  # 解的某一条回路,solve_k[0]是路线，solve[1]是当前装载量
-    no_usd = list(range(1, 71))
+    solve = []
+    for i in range(len(data_con) - 1):  # 初始化
+        solve.append([[0, i + 1, 0], data_con[i + 1]])  # solve[k][0]第k+1个客户点,solve[k][1]现在的装载值   1 - 70
 
-    while S_new[index[0]][1] > 0:
-        k = 0
-        while S_new[index[k]][1] > 0:
-            x, y = int(S_new[index[k]][0] // S.shape[0]), int(S_new[index[k]][0] % S.shape[0] - 1)
-            if (x in no_usd) and (y in no_usd):
-                solve_k = [[0, x, y, 0], data_con[x] + data_con[y]]
-                no_usd.remove(x)
-                no_usd.remove(y)
-                index = np.delete(index, k)
-                break
-            else:
-                k += 1
+    can_use_left = [i + 1 for i in range(len(data_con) - 1)]  # 左边为0的点  1 - 70
+    can_use_right = [i + 1 for i in range(len(data_con) - 1)]  # 右边为0的点  1 - 70
 
-        if solve_k[1] == 0:  # 判断是否成功初始化
-            break  # 意味着剩下的客户点不足以形成三个点及以上的回路
-        else:
-            k = 0  # 初始化成功，重新试着拓展回路
-            while S_new[index[k]][1] > 0:
-                x, y = int(S_new[index[k]][0] // S.shape[0]), int(S_new[index[k]][0] % S.shape[0] - 1)
+    k = 0
+    while S_new[index[k]][1] > 0:
+        x, y = int(S_new[index[k]][0] // S.shape[0]), int(S_new[index[k]][0] % S.shape[0] - 1)
+        if (x in can_use_right) and (y in can_use_left):  # x-y
+            index_x, index_y = 0, 0
+            for i in range(len(solve)):
+                if x in solve[i][0]:
+                    index_x = i
+            for i in range(len(solve)):
+                if y in solve[i][0]:
+                    index_y = i
 
-                if (x in solve_k[0]) and (y not in solve_k[0]):
-                    if (y in no_usd) and data_con[y] + solve_k[1] <= CAR_MAX:
-                        no_usd.remove(y)
-                        solve_k[1] = data_con[y] + solve_k[1]
-                        c = solve_k[0].index(x)
-                        if solve_k[0][c - 1] == 0:
-                            solve_k[0].insert(1, y)
-                        else:
-                            solve_k[0].insert(-2, y)
-                        index = np.delete(index, k)
-                elif (y in solve_k[0]) and (x not in solve_k[0]):
-                    if (x in no_usd) and data_con[x] + solve_k[1] <= CAR_MAX:
-                        no_usd.remove(x)
-                        solve_k[1] = data_con[x] + solve_k[1]
-                        c = solve_k[0].index(y)
-                        if solve_k[0][c - 1] == 0:
-                            solve_k[0].insert(1, x)
-                        else:
-                            solve_k[0].insert(-2, x)
-                        index = np.delete(index, k)
+            if solve[index_x][1] + solve[index_y][1] < CAR_MAX:  # 确定可以合并
+                can_use_left.remove(y)  # 删去x,y的各自的左、右0
+                can_use_right.remove(x)
+                solve[index_x][0].pop()  # 删去解上的0
+                solve[index_y][0].pop(0)
+                solve[index_x][0].extend(solve[index_y][0])  # 两列表合并
+                solve[index_x][1] += solve[index_y][1]  # 解合并
+                del solve[index_y]  # 删元素
 
-                k += 1
+        elif (y in can_use_right) and (x in can_use_left):  # y-x
+            index_x, index_y = 0, 0
+            for i in range(len(solve)):
+                if x in solve[i][0]:
+                    index_x = i
+            for i in range(len(solve)):
+                if y in solve[i][0]:
+                    index_y = i
 
-            solve.append(solve_k)
-            solve_k = [[0, 0], 0]
+            if solve[index_x][1] + solve[index_y][1] < CAR_MAX:  # 确定可以合并
+                can_use_left.remove(x)  # 删去x,y的各自的左、右0
+                can_use_right.remove(y)
+                solve[index_y][0].pop()  # 删去解上的0
+                solve[index_x][0].pop(0)
+                solve[index_y][0].extend(solve[index_x][0])  # 两列表合并
+                solve[index_y][1] += solve[index_x][1]  # 解合并
+                del solve[index_x]  # 删元素
 
-    if len(no_usd) != 0:
-        for k in no_usd:
-            solve.append([[0, k, 0], data_con[i]])
+        k += 1
     return solve
 
 
@@ -141,12 +128,15 @@ def solve_plot(solve, data_e=data_e):
     for i, txt in enumerate(range(data_e.shape[0])):  # 给点写上编号
         ax1.annotate(txt, (data_e[i, 0], data_e[i, 1]))
 
-    for i in range(len(solve)):
-        x, y = deal_solve(solve[i])
-        for j in range(len(x)):
-            plt.plot(x[j], y[j], color='r')
+    # for i in range(len(solve)):
+    #     x, y = deal_solve(solve[i])
+    #     for j in range(len(x)):
+    #         plt.plot(x[j], y[j], color='r')
 
-    print(data_e[solve[0][0], 0], data_e[solve[0][0], 1])
+    x, y = deal_solve(solve[0])
+    for j in range(len(x)):
+        plt.plot(x[j], y[j], color='r')
+
     plt.show()
 
 
@@ -154,7 +144,7 @@ def main():
     solve_greedy = saving()
     total_distance, initial = desolve(solve_greedy)
     solve_plot(initial)
-    return initial
+    return total_distance, initial
 
 
 main()
