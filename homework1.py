@@ -129,6 +129,7 @@ def saving(S_new=S_new, index=index, data_con=data_con):
                 del solve[index_y]
 
         k += 1
+
     return solve
 
 
