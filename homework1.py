@@ -182,14 +182,10 @@ def solve_plot(solve, data_e=data_e):
     for i, txt in enumerate(range(data_e.shape[0])):  # 给点写上编号
         ax1.annotate(txt, (data_e[i, 0], data_e[i, 1]))
 
-    # for i in range(len(solve)):
-    #     x, y = deal_solve(solve[i])
-    #     for j in range(len(x)):
-    #         plt.plot(x[j], y[j], color='r')
-
-    x, y = deal_solve(solve[0])
-    for j in range(len(x)):
-        plt.plot(x[j], y[j], color='r')
+    for i in range(len(solve)):
+        x, y = deal_solve(solve[i])
+        for j in range(len(x)):
+            plt.plot(x[j], y[j], color='r')
 
     plt.show()
 
