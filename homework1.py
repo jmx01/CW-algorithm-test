@@ -5,11 +5,10 @@ import matplotlib.pyplot as plt
 
 CAR_MAX = 100  # 车的容量
 
-data_origin = pd.read_excel("./data.xlsx")
-dt = data_origin.copy()  # 复制数据
+dt = pd.read_excel("./data.xlsx")  # 复制数据
 dt.iloc[0, 3] = 0  # 处理仓库
 data_e = np.array(dt.iloc[:, 1:3])  # 单独取出坐标
-data_con = np.array(dt.iloc[:, 3])  # 客户点的量  0 - 70
+data_con = np.array(dt.iloc[:, 3])  # 客户点的量  0 - 70  data_con[k]即为第k个点的装载量
 
 C = np.zeros([data_e.shape[0], data_e.shape[0]])  # 距离矩阵，创建零矩阵
 for i in range(C.shape[0]):
@@ -22,7 +21,10 @@ S = np.zeros([data_e.shape[0], data_e.shape[0]])  # 节约矩阵，创建零矩�
 for i in range(C.shape[0]):
     for j in range(C.shape[1]):
         S[i][j] = C[i][0] + C[0][j] - C[i][j]  # 节约矩阵
+        if i == j:
+            S[i][j] = 0
 
+S = np.triu(S)
 S_new = np.array([range(S.size), S.flatten()]).T  # [[编号（解码回矩阵），节约矩阵的saving]]
 index = np.argsort(S.flatten())[::-1]  # 排序编码下标
 
@@ -36,18 +38,20 @@ def saving(S_new=S_new, index=index, data_con=data_con):
     can_use_right = [i + 1 for i in range(len(data_con) - 1)]  # 右边为0的点  1 - 70
 
     k = 0
-    while S_new[index[k]][1] > 0:
-        x, y = int(S_new[index[k]][0] // S.shape[0]), int(S_new[index[k]][0] % S.shape[0] - 1)
-        if (x in can_use_right) and (y in can_use_left):  # x-y
+    while S_new[index[k]][1] > 0:  # 第k+1大的节约值是否大于0
+        x, y = int(S_new[index[k]][0] // S.shape[0]), int(S_new[index[k]][0] % S.shape[0])  # x,y为第x个客户和第y个客户
+        if (x in can_use_right) and (y in can_use_left):  # x-0-0-y
             index_x, index_y = 0, 0
             for i in range(len(solve)):
                 if x in solve[i][0]:
                     index_x = i
+                    break
             for i in range(len(solve)):
                 if y in solve[i][0]:
                     index_y = i
+                    break
 
-            if solve[index_x][1] + solve[index_y][1] < CAR_MAX:  # 确定可以合并
+            if (index_x != index_y) and (solve[index_x][1] + solve[index_y][1] < CAR_MAX):  # 确定可以合并
                 can_use_left.remove(y)  # 删去x,y的各自的左、右0
                 can_use_right.remove(x)
                 solve[index_x][0].pop()  # 删去解上的0
@@ -56,16 +60,18 @@ def saving(S_new=S_new, index=index, data_con=data_con):
                 solve[index_x][1] += solve[index_y][1]  # 解合并
                 del solve[index_y]  # 删元素
 
-        elif (y in can_use_right) and (x in can_use_left):  # y-x
+        elif (y in can_use_right) and (x in can_use_left):  # y-0-0-x
             index_x, index_y = 0, 0
             for i in range(len(solve)):
                 if x in solve[i][0]:
                     index_x = i
+                    break
             for i in range(len(solve)):
                 if y in solve[i][0]:
                     index_y = i
+                    break
 
-            if solve[index_x][1] + solve[index_y][1] < CAR_MAX:  # 确定可以合并
+            if (index_x != index_y) and (solve[index_x][1] + solve[index_y][1] < CAR_MAX):  # 确定可以合并
                 can_use_left.remove(x)  # 删去x,y的各自的左、右0
                 can_use_right.remove(y)
                 solve[index_y][0].pop()  # 删去解上的0
@@ -73,6 +79,54 @@ def saving(S_new=S_new, index=index, data_con=data_con):
                 solve[index_y][0].extend(solve[index_x][0])  # 两列表合并
                 solve[index_y][1] += solve[index_x][1]  # 解合并
                 del solve[index_x]  # 删元素
+
+        elif (x in can_use_left) and (y in can_use_left):
+            index_x, index_y = 0, 0
+            for i in range(len(solve)):
+                if x in solve[i][0]:
+                    index_x = i
+                    break
+            for i in range(len(solve)):
+                if y in solve[i][0]:
+                    index_y = i
+                    break
+
+            if (index_x != index_y) and (solve[index_x][1] + solve[index_y][1] < CAR_MAX):
+                can_use_left.remove(x)
+                can_use_left.remove(y)
+                solve[index_x][0].pop(0)
+                solve[index_y][0].pop(0)
+                c = solve[index_y][0][-2]
+                can_use_right.remove(c)
+                can_use_left.append(c)
+                solve[index_y][0] = solve[index_y][0][::-1]
+                solve[index_y][0].extend(solve[index_x][0])
+                solve[index_y][1] += solve[index_x][1]
+                del solve[index_x]
+
+        elif (x in can_use_right) and (y in can_use_right):
+            index_x, index_y = 0, 0
+            for i in range(len(solve)):
+                if x in solve[i][0]:
+                    index_x = i
+                    break
+            for i in range(len(solve)):
+                if y in solve[i][0]:
+                    index_y = i
+                    break
+
+            if (index_x != index_y) and (solve[index_x][1] + solve[index_y][1] < CAR_MAX):
+                can_use_right.remove(x)
+                can_use_right.remove(y)
+                solve[index_x][0].pop()
+                solve[index_y][0].pop()
+                c = solve[index_y][0][1]
+                can_use_left.remove(c)
+                can_use_right.append(c)
+                solve[index_y][0] = solve[index_y][0][::-1]
+                solve[index_x][0].extend(solve[index_y][0])
+                solve[index_x][1] += solve[index_y][1]
+                del solve[index_y]
 
         k += 1
     return solve
