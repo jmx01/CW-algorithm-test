@@ -1,9 +1,13 @@
 import numpy as np
 import pandas as pd
 import math
+import random
+import copy
+import time
 import matplotlib.pyplot as plt
 
 CAR_MAX = 100  # 车的容量
+ITERATION = 1000000  # 最大迭代次数
 
 dt = pd.read_excel("./data.xlsx")  # 复制数据
 dt.iloc[0, 3] = 0  # 处理仓库
@@ -168,7 +172,7 @@ def deal_solve(solve_k, data_e=data_e):
 
 def solve_plot(solve, data_e=data_e):
     """
-    对输入的解作图
+    对输入的解作vrp图
     :param solve:解
     :param data_e:坐标
     :return:图
@@ -191,11 +195,88 @@ def solve_plot(solve, data_e=data_e):
     plt.show()
 
 
-def main():
+def initial():
     solve_greedy = saving()
-    total_distance, initial = desolve(solve_greedy)
-    solve_plot(initial)
-    return total_distance, initial
+    total_distance, initial_solve = desolve(solve_greedy)
+    solve_plot(initial_solve)
+    return total_distance, initial_solve
+
+
+def test_optimal_solve(optimal_solve, out_k, in_k, out_point, in_point):
+    """
+    更新距离用
+    :param optimal_solve:原解
+    :param out_k:取元素的子解
+    :param in_k:放元素的子解
+    :param out_point:取元素的位置
+    :param in_point:放元素的位置
+    :return: 新解，已更新距离
+    """
+    test = copy.deepcopy(optimal_solve)
+
+    test[in_k][1] += data_con[test[out_k][0][out_point]]  # 更新装载量
+    test[out_k][1] -= data_con[test[out_k][0][out_point]]
+
+    test[in_k][0].insert(in_point, test[out_k][0][out_point])  # 增删元素
+    del test[out_k][0][out_point]
+
+    for c in test:  # 删去最后的距离量
+        c.pop()
+
+    return test
+
+
+def optimal(total_distance, initial_solve, datacon=data_con):
+    """
+    优化算法
+    :param total_distance: 初始化的距离值
+    :param initial_solve: 初始解
+    :param datacon: 装载量
+    :return: 优化解
+    """
+    optimal_solve = copy.deepcopy(initial_solve)
+    optimal_distance = copy.deepcopy(total_distance)
+    optimal_distance_vector = []
+    for i in range(ITERATION):
+        solve_out_index, solve_in_index = random.sample(range(len(optimal_solve)), 2)  # 选某两个子解
+        out_point_index, in_point_index = random.randint(1, len(optimal_solve[solve_out_index][0]) - 2), random.randint(
+            1, len(optimal_solve[solve_in_index][0]) - 1)  # 选择这两个解的取出和放置点
+
+        if datacon[optimal_solve[solve_out_index][0][out_point_index]] + optimal_solve[solve_in_index][1] < CAR_MAX:
+
+            test = test_optimal_solve(optimal_solve, solve_out_index, solve_in_index, out_point_index,
+                                      in_point_index)
+
+            test_distance, test = desolve(test)  # 总路程，重新生成有距离的矩阵
+            if test_distance < optimal_distance:
+                optimal_distance = test_distance
+                optimal_solve = test
+        i += 1
+        optimal_distance_vector.append(optimal_distance)
+    return optimal_distance, optimal_solve, optimal_distance_vector
+
+
+def main():
+    start = time.time()
+    total_distance, initial_solve = initial()
+    optimal_distance, optimal_solve, optimal_distance_vector = optimal(total_distance, initial_solve)
+
+    solve_plot(optimal_solve)  # 绘制vrp图
+    plt.plot(range(ITERATION), optimal_distance_vector)  # 绘制迭代图
+    plt.show()
+
+    end = time.time()
+    print("总迭代数为", ITERATION, "，", "初始距离为", total_distance, "优化距离为", optimal_distance, "耗费时间为",
+          end - start, "秒，", "平均耗时",
+          (end - start) / ITERATION, "秒。")
+    print("saving算法的解：", end="\n")
+    for i in initial_solve:
+        print(i, end="\n")
+    print("{:=^50s}".format("Split Line"))
+    print("optimal saving 算法解：", end="\n")
+    for j in optimal_solve:
+        print(j, end="\n")
+    return optimal_distance, optimal_solve
 
 
 main()
